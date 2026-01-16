@@ -261,13 +261,14 @@ def render_performance_snapshot():
     
     st.subheader("📊 Performance Snapshot")
     
-    # Get headline metrics
+    # Get headline metrics (now includes reactions/likes and shares)
     headline_metrics = snapshot.get_headline_metrics()
     
-    # Create columns for metrics
-    cols = st.columns(len(headline_metrics[:5]))
+    # Create columns for metrics - show up to 6 metrics
+    num_metrics = min(len(headline_metrics), 6)
+    cols = st.columns(num_metrics)
     
-    for i, metric in enumerate(headline_metrics[:5]):
+    for i, metric in enumerate(headline_metrics[:6]):
         with cols[i]:
             # Determine change color
             if metric.is_positive_trend:

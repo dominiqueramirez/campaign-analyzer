@@ -138,7 +138,7 @@ class SlideGenerator:
         )
         title_frame = section_title.text_frame
         title_para = title_frame.paragraphs[0]
-        title_para.text = "📊 Performance Snapshot"
+        title_para.text = "Performance Snapshot"
         title_para.font.size = Pt(16)
         title_para.font.bold = True
         title_para.font.color.rgb = SlideColors.PRIMARY_BLUE
@@ -146,14 +146,14 @@ class SlideGenerator:
         # Get headline metrics
         headline_metrics = self.snapshot.get_headline_metrics()
         
-        # Calculate card positions
+        # Calculate card positions - 6 cards for more metrics
         start_x = 0.3
-        card_width = 2.4
+        card_width = 2.0
         card_height = 1.2
-        card_spacing = 0.15
+        card_spacing = 0.1
         start_y = 1.4
         
-        for i, metric in enumerate(headline_metrics[:5]):
+        for i, metric in enumerate(headline_metrics[:6]):
             x_pos = start_x + (i * (card_width + card_spacing))
             self._add_metric_card(x_pos, start_y, card_width, card_height, metric)
     

@@ -64,12 +64,12 @@ class PerformanceSnapshot:
     top_post: Optional[Dict] = None
     
     def get_headline_metrics(self) -> List[MetricResult]:
-        """Get the top 5 headline metrics for the slide."""
-        priority_order = ['reach', 'engagement', 'engagement_rate', 'clicks', 'reactions', 'shares']
+        """Get the top 6 headline metrics for the slide."""
+        priority_order = ['reach', 'engagement', 'reactions', 'shares', 'clicks', 'engagement_rate']
         headline = []
         
         for key in priority_order:
-            if key in self.metrics and len(headline) < 5:
+            if key in self.metrics and len(headline) < 6:
                 headline.append(self.metrics[key])
         
         return headline
