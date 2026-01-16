@@ -545,6 +545,142 @@ def render_welcome_screen():
     """)
 
 
+def render_post_search():
+    """Render the post search feature."""
+    st.subheader("🔍 Post Search")
+    st.write("Search for specific posts and view their detailed metrics.")
+    
+    df = st.session_state.df
+    if df is None:
+        st.warning("Please load data first.")
+        return
+    
+    # Determine the message column name
+    message_col = next((c for c in ['message', 'Post Message', 'Message', 'post_message'] if c in df.columns), None)
+    
+    if message_col is None:
+        st.error("No post message column found in data.")
+        return
+    
+    # Search input
+    search_query = st.text_input(
+        "Search posts by text",
+        placeholder="Enter keywords to search for...",
+        help="Search through post messages to find specific content"
+    )
+    
+    if search_query:
+        # Filter posts containing the search query (case insensitive)
+        mask = df[message_col].astype(str).str.lower().str.contains(search_query.lower(), na=False)
+        results = df[mask].copy()
+        
+        if len(results) == 0:
+            st.info(f"No posts found containing '{search_query}'")
+        else:
+            st.success(f"Found {len(results)} post(s) matching '{search_query}'")
+            
+            # Display each matching post with its metrics
+            for idx, row in results.iterrows():
+                with st.expander(f"📝 Post from {row.get('date', 'Unknown date')}", expanded=True):
+                    # Post content
+                    st.markdown("**Post Content:**")
+                    message = str(row.get(message_col, 'No message'))
+                    st.markdown(f"> {message[:500]}{'...' if len(message) > 500 else ''}")
+                    
+                    # Post metadata
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        post_type = row.get('Post Type', row.get('post_type', 'N/A'))
+                        st.markdown(f"**Type:** {post_type}")
+                    with col2:
+                        platform = row.get('platform', 'N/A')
+                        st.markdown(f"**Platform:** {platform.title() if platform != 'N/A' else 'N/A'}")
+                    with col3:
+                        date_val = row.get('date', 'N/A')
+                        if hasattr(date_val, 'strftime'):
+                            date_str = date_val.strftime('%b %d, %Y')
+                        else:
+                            date_str = str(date_val)
+                        st.markdown(f"**Date:** {date_str}")
+                    
+                    st.divider()
+                    
+                    # Metrics display
+                    st.markdown("**📊 Post Metrics:**")
+                    
+                    # Define metric mappings (display name, possible column names)
+                    metric_definitions = [
+                        ("Reach", ['reach', 'Reach', 'Total Reach']),
+                        ("Engagement", ['engagement', 'Post engagement', 'Engagement']),
+                        ("Reactions/Likes", ['reactions', 'Reactions', 'Likes', 'likes']),
+                        ("Shares", ['shares', 'Shares (unique)', 'Shares']),
+                        ("Clicks", ['clicks', 'Clicks', 'Link Clicks']),
+                        ("Comments", ['comments', 'Comments']),
+                        ("Viral Reach", ['viral_reach', 'Viral reach', 'Viral Reach']),
+                        ("Impressions", ['impressions', 'Fan impressions (unique)', 'Impressions']),
+                    ]
+                    
+                    # Create metrics display in rows of 4
+                    metrics_found = []
+                    for display_name, col_names in metric_definitions:
+                        for col_name in col_names:
+                            if col_name in row.index:
+                                value = row[col_name]
+                                if pd.notna(value):
+                                    metrics_found.append((display_name, value))
+                                break
+                    
+                    # Display metrics in columns
+                    if metrics_found:
+                        cols = st.columns(4)
+                        for i, (metric_name, metric_value) in enumerate(metrics_found):
+                            with cols[i % 4]:
+                                # Format the value
+                                if isinstance(metric_value, float):
+                                    if metric_value < 1:
+                                        formatted = f"{metric_value:.2%}"
+                                    elif metric_value >= 1000:
+                                        formatted = f"{metric_value:,.0f}"
+                                    else:
+                                        formatted = f"{metric_value:.0f}"
+                                else:
+                                    formatted = f"{int(metric_value):,}" if pd.notna(metric_value) else "N/A"
+                                
+                                st.metric(label=metric_name, value=formatted)
+                    else:
+                        st.info("No metrics available for this post.")
+                    
+                    # Engagement rate calculation
+                    reach_col = next((c for c in ['reach', 'Reach'] if c in row.index and pd.notna(row[c]) and row[c] > 0), None)
+                    eng_col = next((c for c in ['engagement', 'Post engagement'] if c in row.index and pd.notna(row[c])), None)
+                    
+                    if reach_col and eng_col:
+                        eng_rate = (row[eng_col] / row[reach_col]) * 100
+                        st.markdown(f"**Engagement Rate:** {eng_rate:.2f}%")
+                    
+                    # Link to original post
+                    permalink = row.get('permalink', row.get('Post Permalink', None))
+                    if permalink and pd.notna(permalink):
+                        st.markdown(f"[🔗 View Original Post]({permalink})")
+    else:
+        # Show recent posts when no search query
+        st.markdown("---")
+        st.markdown("**Recent Posts Preview:**")
+        
+        # Show last 5 posts
+        recent = df.head(5)
+        for idx, row in recent.iterrows():
+            message = str(row.get(message_col, ''))[:100]
+            date_val = row.get('date', '')
+            if hasattr(date_val, 'strftime'):
+                date_str = date_val.strftime('%b %d')
+            else:
+                date_str = str(date_val)[:10]
+            
+            engagement = row.get('Post engagement', row.get('engagement', 0))
+            st.markdown(f"• **{date_str}**: {message}... ({int(engagement):,} engagements)")
+
+
 def main():
     """Main application entry point."""
     init_session_state()
@@ -559,23 +695,30 @@ def main():
     if not st.session_state.data_loaded:
         render_welcome_screen()
     else:
-        # Show data preview
-        render_data_preview()
+        # Create tabs for different features
+        tab1, tab2 = st.tabs(["📊 Dashboard", "🔍 Post Search"])
         
-        # If report is generated, show results
-        if st.session_state.snapshot:
-            render_performance_snapshot()
+        with tab1:
+            # Show data preview
+            render_data_preview()
             
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                render_trend_chart()
-            with col2:
-                render_top_content()
-            
-            render_insights_section()
-            render_export_section()
-        else:
-            st.info("👆 Click 'Generate Report' in the sidebar to analyze your data and generate insights!")
+            # If report is generated, show results
+            if st.session_state.snapshot:
+                render_performance_snapshot()
+                
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    render_trend_chart()
+                with col2:
+                    render_top_content()
+                
+                render_insights_section()
+                render_export_section()
+            else:
+                st.info("👆 Click 'Generate Report' in the sidebar to analyze your data and generate insights!")
+        
+        with tab2:
+            render_post_search()
 
 
 if __name__ == "__main__":
