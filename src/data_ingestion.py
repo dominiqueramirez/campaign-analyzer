@@ -41,15 +41,17 @@ class SocialMediaDataLoader:
             'wow_reactions_col': 'Reactions: Wow',
         },
         'instagram': {
-            'date_col': 'Date',
+            'date_col': 'Date (GMT)',
+            'page_col': 'Instagram Business Account',
+            'post_id_col': 'Post ID',
+            'post_type_col': 'Post Type',
+            'message_col': 'Post Message',
+            'permalink_col': 'Post Permalink',
             'reach_col': 'Reach',
-            'impressions_col': 'Impressions',
-            'engagement_col': 'Engagement',
-            'engagement_rate_col': 'Engagement Rate',
+            'engagement_rate_col': 'Engagement rate',
             'likes_col': 'Likes',
             'comments_col': 'Comments',
-            'saves_col': 'Saves',
-            'shares_col': 'Shares',
+            'tag_col': 'Tag',
         },
         'linkedin': {
             'date_col': 'Date',
@@ -62,13 +64,16 @@ class SocialMediaDataLoader:
             'shares_col': 'Shares',
         },
         'twitter': {
-            'date_col': 'Date',
+            'date_col': 'Date (GMT)',
+            'page_col': 'Twitter Account',
+            'post_id_col': 'Post ID',
+            'post_type_col': 'Post Type',
+            'message_col': 'Post Message',
+            'permalink_col': 'Post Permalink',
             'impressions_col': 'Impressions',
             'engagement_col': 'Engagements',
             'engagement_rate_col': 'Engagement Rate',
-            'likes_col': 'Likes',
-            'retweets_col': 'Retweets',
-            'replies_col': 'Replies',
+            'tag_col': 'Tag',
         }
     }
     
@@ -81,18 +86,22 @@ class SocialMediaDataLoader:
         Automatically detect the social media platform from column names.
         """
         columns = set(df.columns.str.lower())
+        columns_str = ' '.join(df.columns).lower()
         
-        if 'facebook page' in columns or 'facebook' in ' '.join(columns).lower():
-            return 'facebook'
-        elif 'instagram' in ' '.join(columns).lower():
-            return 'instagram'
-        elif 'linkedin' in ' '.join(columns).lower():
-            return 'linkedin'
-        elif any(x in columns for x in ['retweets', 'tweet', 'twitter']):
+        # Check for specific platform identifiers
+        if 'twitter account' in columns or 'twitter' in columns_str:
             return 'twitter'
+        elif 'instagram business account' in columns or 'instagram' in columns_str:
+            return 'instagram'
+        elif 'facebook page' in columns or 'facebook' in columns_str:
+            return 'facebook'
+        elif 'linkedin' in columns_str:
+            return 'linkedin'
         
-        # Default to facebook if has similar structure
-        if 'post engagement' in columns or 'engagement rate' in columns:
+        # Check for platform-specific metrics
+        if 'engagements' in columns and 'impressions' in columns:
+            return 'twitter'
+        elif 'post engagement' in columns:
             return 'facebook'
         
         return 'unknown'
@@ -142,6 +151,8 @@ class SocialMediaDataLoader:
         date_col = col_map.get('date_col', 'Date')
         if date_col in df.columns:
             df['date'] = pd.to_datetime(df[date_col], errors='coerce')
+        elif 'Date (GMT)' in df.columns:
+            df['date'] = pd.to_datetime(df['Date (GMT)'], errors='coerce')
         elif 'Date' in df.columns:
             df['date'] = pd.to_datetime(df['Date'], errors='coerce')
         else:
@@ -151,17 +162,56 @@ class SocialMediaDataLoader:
                     df['date'] = pd.to_datetime(df[col], errors='coerce')
                     break
         
-        # Standardize numeric columns
-        numeric_cols = ['Reach', 'Clicks', 'Post engagement', 'Reactions', 
-                        'Shares (unique)', 'Viral reach', 'Fan impressions (unique)']
+        # Standardize numeric columns - Facebook
+        fb_numeric_cols = ['Reach', 'Clicks', 'Post engagement', 'Reactions', 
+                          'Shares (unique)', 'Viral reach', 'Fan impressions (unique)']
         
-        for col in numeric_cols:
+        # Standardize numeric columns - Instagram
+        ig_numeric_cols = ['Reach', 'Likes', 'Comments']
+        
+        # Standardize numeric columns - Twitter/X
+        tw_numeric_cols = ['Impressions', 'Engagements']
+        
+        # Process all numeric columns
+        all_numeric_cols = list(set(fb_numeric_cols + ig_numeric_cols + tw_numeric_cols))
+        for col in all_numeric_cols:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
-        # Engagement rate handling
+        # Engagement rate handling (different column names per platform)
         if 'Engagement rate' in df.columns:
             df['Engagement rate'] = pd.to_numeric(df['Engagement rate'], errors='coerce').fillna(0)
+        elif 'Engagement Rate' in df.columns:
+            df['Engagement rate'] = pd.to_numeric(df['Engagement Rate'], errors='coerce').fillna(0)
+        
+        # Platform-specific standardization
+        if platform == 'instagram':
+            # Calculate engagement from Likes + Comments for Instagram
+            if 'Likes' in df.columns and 'Comments' in df.columns:
+                df['Post engagement'] = df['Likes'] + df['Comments']
+            # Use Likes as Reactions equivalent
+            if 'Likes' in df.columns and 'Reactions' not in df.columns:
+                df['Reactions'] = df['Likes']
+            # Instagram doesn't have clicks or shares in this format
+            if 'Clicks' not in df.columns:
+                df['Clicks'] = 0
+            if 'Shares (unique)' not in df.columns:
+                df['Shares (unique)'] = 0
+        
+        elif platform == 'twitter':
+            # Twitter/X uses Engagements as total engagement
+            if 'Engagements' in df.columns:
+                df['Post engagement'] = df['Engagements']
+            # Twitter/X uses Impressions instead of Reach
+            if 'Impressions' in df.columns and 'Reach' not in df.columns:
+                df['Reach'] = df['Impressions']
+            # Twitter/X doesn't have separate reactions/clicks/shares in this CSV format
+            if 'Reactions' not in df.columns:
+                df['Reactions'] = 0
+            if 'Clicks' not in df.columns:
+                df['Clicks'] = 0
+            if 'Shares (unique)' not in df.columns:
+                df['Shares (unique)'] = 0
         
         # Add platform identifier
         df['platform'] = platform

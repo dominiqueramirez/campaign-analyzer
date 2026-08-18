@@ -232,9 +232,9 @@ class InsightsEngine:
         top_post = self.snapshot.top_post
         
         if top_post:
-            post_type = top_post.get('post_type', 'Post')
-            engagement = top_post.get('engagement', 0)
-            reach = top_post.get('reach', 0)
+            post_type = str(top_post.get('post_type', 'Post'))
+            engagement = int(top_post.get('engagement', 0))
+            reach = int(top_post.get('reach', 0))
             
             self.insights.append(Insight(
                 type=InsightType.CALLOUT,
@@ -245,7 +245,7 @@ class InsightsEngine:
             ))
             
             # Add content insight
-            message_preview = top_post.get('message', '')[:100]
+            message_preview = str(top_post.get('message', ''))[:100]
             if message_preview:
                 self.what_happened.append(f"🏆 Top content: \"{message_preview}...\" drove highest engagement.")
     

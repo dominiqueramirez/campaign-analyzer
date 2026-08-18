@@ -104,14 +104,8 @@ def init_session_state():
 
 def render_header():
     """Render the application header."""
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        st.markdown('<p class="main-header">📊 Campaign Analyzer</p>', unsafe_allow_html=True)
-        st.markdown('<p class="sub-header">Generate executive-ready social media performance slides in minutes</p>', unsafe_allow_html=True)
-    
-    with col2:
-        st.image("https://www.va.gov/img/homepage/va-logo-white-bg.png", width=150)
+    st.markdown('<p class="main-header">📊 Campaign Analyzer</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Generate executive-ready social media performance slides in minutes</p>', unsafe_allow_html=True)
 
 
 def render_sidebar():
@@ -581,7 +575,33 @@ def render_post_search():
             
             # Display each matching post with its metrics
             for idx, row in results.iterrows():
-                with st.expander(f"📝 Post from {row.get('date', 'Unknown date')}", expanded=True):
+                # Check for media indicators
+                permalink = str(row.get('permalink', row.get('Post Permalink', '')))
+                message = str(row.get(message_col, ''))
+                post_type_val = str(row.get('Post Type', row.get('post_type', ''))).lower()
+                platform_val = str(row.get('platform', '')).lower()
+                
+                # Detect media type based on platform and post type
+                has_photo = (
+                    '/photo/' in permalink or 
+                    '/photo/' in message or
+                    post_type_val in ['photo', 'carousel album', 'image']
+                )
+                has_video = (
+                    '/video/' in permalink or 
+                    '/video/' in message or 
+                    post_type_val in ['reel', 'video', 'story']
+                )
+                
+                # Create expander title with media indicator
+                date_display = row.get('date', 'Unknown date')
+                media_icon = ""
+                if has_video:
+                    media_icon = "🎬 "
+                elif has_photo:
+                    media_icon = "📷 "
+                
+                with st.expander(f"{media_icon}📝 Post from {date_display}", expanded=True):
                     # Post content
                     st.markdown("**Post Content:**")
                     message = str(row.get(message_col, 'No message'))
@@ -602,6 +622,11 @@ def render_post_search():
                         else:
                             date_str = str(date_val)
                         st.markdown(f"**Date:** {date_str}")
+                    
+                    # Media indicator
+                    if has_photo or has_video:
+                        media_type = "🎬 Video/Reel" if has_video else "📷 Photo"
+                        st.info(f"**Media:** {media_type} attached - [View on platform]({permalink})")
                     
                     st.divider()
                     
